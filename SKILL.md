@@ -12,9 +12,11 @@ Launchpad is a web dashboard for managing local services. Each service stores it
 | Command | What it does |
 |---------|-------------|
 | `lp start` | Start web panel |
-| `lp list` | List all services |
+| `lp stop` | Stop panel + all services |
+| `lp list` | List all services (shows real status) |
 | `lp run <id>` | Start a service |
-| `lp stop <id>` | Stop a service |
+| `lp kill <id>` | Stop a service |
+| `lp remove <id>` | Delete a service from registry |
 | `lp register <name> <path>` | Register a new service |
 
 ## Reference
@@ -151,5 +153,6 @@ bash <launchpad-dir>/launch.sh start
 ## Removing a Service
 
 When asked to remove/delete a service:
-1. Remove the entry from `services.json`
-2. Ask if they want to keep the `.launchpad/` scripts or delete them too
+1. Check the service isn't still running — `lp remove` will refuse if it detects the service is active
+2. Run `lp kill <id>` first if the service is running, then `lp remove <id>`
+3. Ask if they want to keep the `.launchpad/` scripts or delete them too

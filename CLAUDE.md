@@ -17,15 +17,16 @@ bash launch.sh install    # → ~/.local/bin/lp
 
 # 面板控制
 lp start                  # 启动 Web 面板 http://localhost:9999
-lp stop                   # 停止面板
+lp stop                   # 停所有服务 + 停止面板
 lp status                 # 查看面板状态
 lp restart                # 重启面板
 
 # 服务管理
-lp list                   # 列出所有服务
+lp list                   # 列出所有服务（显示真实状态）
 lp run <id>               # 启动服务
-lp stop <id>              # 停止服务
-lp register <name> <path> # 注册新服务
+lp kill <id>              # 停止服务
+lp remove <id>            # 从注册表删除服务
+lp register <name> <path> # 注册新服务（自动校验脚本是否存在）
 ```
 
 添加服务使用 `/launchpad` 命令或 `lp register` 即可。

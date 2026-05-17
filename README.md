@@ -59,12 +59,13 @@ Once installed, `lp` works from any directory:
 # Service management
 lp list                    # List all services with status
 lp run n8n                 # Start a service
-lp stop n8n                # Stop a service
+lp kill n8n                # Stop a service
+lp remove n8n              # Delete a service from registry
 lp register MyApp ~/app    # Register a new service
 
 # Panel control
-lp start                   # Start the web panel
-lp stop                    # Stop the web panel
+lp start                   # Start the web panel (port 9999)
+lp stop                    # Stop the panel + all services
 lp status                  # Check if the panel is running
 lp restart                 # Restart the panel
 ```
