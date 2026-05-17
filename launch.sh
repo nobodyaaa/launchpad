@@ -8,8 +8,6 @@ LOG_FILE="$DATA_DIR/launchpad.log"
 CONFIG_FILE="$DATA_DIR/services.json"
 SERVER_SCRIPT="$SCRIPT_DIR/server.py"
 
-API="http://127.0.0.1:9999/api/services"
-
 # ── Server ──
 
 server_start() {
@@ -23,6 +21,22 @@ server_start() {
         rm "$PID_FILE"
     fi
 
+    # Check what's on port 9999
+    local port_pid
+    port_pid=$(ss -tlnp 2>/dev/null | grep ':9999' | grep -oP 'pid=\K[0-9]+' || true)
+    if [ -n "$port_pid" ]; then
+        if [ -f "$PID_FILE" ] && [ "$(cat "$PID_FILE" 2>/dev/null)" = "$port_pid" ]; then
+            echo "Launchpad is already running (PID $port_pid)"
+            echo "Visit http://localhost:9999"
+            exit 0
+        fi
+        local port_cmd
+        port_cmd=$(ps -p "$port_pid" -o comm= 2>/dev/null || echo "unknown")
+        echo "Port 9999 is already in use by PID $port_pid ($port_cmd)"
+        echo "Use 'kill $port_pid' to free it, then try again"
+        exit 1
+    fi
+
     LAUNCHPAD_DIR="$DATA_DIR" nohup python3 "$SERVER_SCRIPT" >> "$LOG_FILE" 2>&1 &
     pid=$!
     echo $pid > "$PID_FILE"
@@ -33,14 +47,43 @@ server_start() {
     echo "Visit http://localhost:9999"
 }
 
+_stop_all_services() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        return
+    fi
+    python3 -c "
+import json, subprocess, sys
+with open('$CONFIG_FILE') as f:
+    services = json.load(f)
+for svc_id, svc in services.items():
+    script = svc.get('path', '') + '/.launchpad/stop.sh'
+    result = subprocess.run(['bash', script], capture_output=True, text=True)
+    if result.returncode == 0:
+        print(f'  ✓ {svc[\"label\"]}')
+    else:
+        print(f'  ✗ {svc[\"label\"]}: {result.stderr.strip() or result.stdout.strip()}')
+" 2>/dev/null || true
+}
+
 server_stop() {
     if [ ! -f "$PID_FILE" ]; then
         echo "Launchpad is not running (no PID file)"
         exit 1
     fi
+
+    echo "Stopping all services..."
+    _stop_all_services
+
     pid=$(cat "$PID_FILE")
     if kill "$pid" 2>/dev/null; then
-        echo "Launchpad stopped (PID $pid)"
+        # Wait for the process to actually exit
+        for i in 1 2 3 4 5; do
+            kill -0 "$pid" 2>/dev/null || { echo "Launchpad stopped (PID $pid)"; rm -f "$PID_FILE"; return 0; }
+            sleep 1
+        done
+        # Force kill if still alive
+        kill -9 "$pid" 2>/dev/null || true
+        echo "Launchpad force killed (PID $pid)"
     else
         echo "Process $pid not found, removing stale PID file"
     fi
@@ -127,6 +170,12 @@ svc_add() {
     id=$(echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]/-/g' | sed 's/^-\+//;s/-\+$//')
     [ -z "$id" ] && id=$(basename "$path")
 
+    if [ ! -f "$path/.launchpad/start.sh" ] || [ ! -f "$path/.launchpad/stop.sh" ]; then
+        echo "Error: $path/.launchpad/ is missing start.sh or stop.sh"
+        echo "Create them first, or use /launchpad skill to auto-generate"
+        exit 1
+    fi
+
     python3 -c "
 import json
 with open('$CONFIG_FILE') as f:
@@ -142,7 +191,10 @@ with open('$CONFIG_FILE', 'w') as f:
 print('Registered: $name ($id)')
 "
 
-    [ -d "$path/.launchpad" ] || echo "Note: $path/.launchpad/ doesn't exist — create start.sh and stop.sh"
+    if [ ! -d "$path/.launchpad" ]; then
+        echo "Note: $path/.launchpad/ doesn't exist — create start.sh and stop.sh"
+        echo "Hint: use /launchpad skill to auto-generate them"
+    fi
 }
 
 svc_list() {
@@ -151,33 +203,141 @@ svc_list() {
         return
     fi
 
-    printf "%-20s %-8s  %s\n" "ID" "STATE" "LABEL"
-    printf -- "------------------------------\n"
+    python3 -c "
+import json, os, subprocess, sys, socket
+from urllib.parse import urlparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# One-shot: collect all listening ports
+listeners: set[str] = set()
+try:
+    r = subprocess.run(['ss', '-tlnp', '--no-header'], capture_output=True, text=True, timeout=5)
+    for line in r.stdout.strip().split('\n'):
+        parts = line.strip().split()
+        if len(parts) >= 4:
+            listeners.add(parts[3].rsplit(':', 1)[-1])
+except Exception:
+    pass
+
+cfg = json.load(open('$CONFIG_FILE'))
+
+def get_status(svc_id, svc):
+    path = svc.get('path', '')
+    label = svc.get('label', '')
+    url = svc.get('url', '')
+    if not os.path.isdir(path):
+        return (svc_id, 'missing', label)
+    # Check url port first (works for both docker and non-docker)
+    if url:
+        parsed = urlparse(url)
+        port = str(parsed.port) if parsed.port else ''
+        if port and port in listeners:
+            return (svc_id, 'running', label)
+        if port:
+            return (svc_id, 'stopped', label)
+    # No url: fallback detection
+    is_docker = any(
+        os.path.isfile(os.path.join(path, name))
+        for name in ('docker-compose.yml', 'docker-compose.yaml', 'compose.yaml')
+    )
+    if is_docker:
+        project = os.path.basename(os.path.normpath(path))
+        r = subprocess.run(
+            ['docker', 'ps', '--filter', f'label=com.docker.compose.project={project}',
+             '--format', '{{.Names}}'],
+            capture_output=True, text=True, timeout=5
+        )
+        return (svc_id, 'running' if r.returncode == 0 and r.stdout.strip() else 'stopped', label)
+    # Non-docker without url: check /proc/<pid>/cwd
+    running = False
+    for p in os.listdir('/proc'):
+        if not p.isdigit():
+            continue
+        try:
+            cwd = os.readlink(f'/proc/{p}/cwd')
+            if os.path.samefile(cwd, path):
+                running = True
+                break
+        except OSError:
+            continue
+    return (svc_id, 'running' if running else 'stopped', label)
+
+with ThreadPoolExecutor(max_workers=8) as pool:
+    futures = {pool.submit(get_status, k, v): k for k, v in cfg.items()}
+    results = [f.result() for f in as_completed(futures)]
+
+print(f'{\"ID\":<20} {\"STATE\":<8}  LABEL')
+print('------------------------------')
+for svc_id, state, label in sorted(results, key=lambda x: x[0]):
+    print(f'{svc_id:<20} {state:<8}  {label}')
+" 2>/dev/null || {
+    # Fallback: just dump ids
     python3 -c "
 import json
 cfg = json.load(open('$CONFIG_FILE'))
-for k, v in cfg.items():
-    state = '?'
-    print(f'{k:<20} {state:<8} {v.get(\"label\", \"\")}')
-" | column -t -s $'\t'
+for k in cfg:
+    print(k)
+" 2>/dev/null || echo 'error listing services'
+}
 }
 
-svc_list_with_status() {
-    # Fetch from API for live status
-    local data
-    data=$(curl -sf "$API" 2>/dev/null) || {
-        svc_list
-        return
-    }
+svc_remove() {
+    local id="$1"
+    [ -n "$id" ] || { echo "Usage: launchpad remove <id>"; exit 1; }
+
     python3 -c "
-import json
-services = json.loads('''$data''')
-for s in services:
-    state = s.get('state', '?')
-    url = s.get('url', '')
-    print(f'{s[\"id\"]:<20} {state:<8} {s[\"label\"]}  {url}')
-" 2>/dev/null || svc_list
+import json, os, subprocess, socket
+from urllib.parse import urlparse
+
+with open('$CONFIG_FILE') as f:
+    services = json.load(f)
+
+svc = services.get('$id')
+if not svc:
+    print('Service \"$id\" not found')
+    exit(1)
+
+label = svc.get('label', '$id')
+path = svc.get('path', '')
+url = svc.get('url', '')
+
+# Check if service is still running
+running = False
+if url:
+    parsed = urlparse(url)
+    port = str(parsed.port) if parsed.port else ''
+    if port:
+        try:
+            r = subprocess.run(['ss', '-tlnp', '--no-header'], capture_output=True, text=True, timeout=5)
+            for line in r.stdout.strip().split('\n'):
+                parts = line.strip().split()
+                if len(parts) >= 4 and parts[3].rsplit(':', 1)[-1] == port:
+                    running = True
+                    break
+        except Exception:
+            pass
+elif path and os.path.isdir(path):
+    is_docker = any(
+        os.path.isfile(os.path.join(path, name))
+        for name in ('docker-compose.yml', 'docker-compose.yaml', 'compose.yaml')
+    )
+    if is_docker:
+        project = os.path.basename(os.path.normpath(path))
+        r = subprocess.run(
+            ['docker', 'ps', '--filter', f'label=com.docker.compose.project={project}', '--format', '{{.Names}}'],
+            capture_output=True, text=True, timeout=5
+        )
+        running = r.returncode == 0 and bool(r.stdout.strip())
+
+if running:
+    print(f'{label} ($id) is still running — stop it first with \"lp kill $id\"')
+    exit(1)
+
+del services['$id']
+with open('$CONFIG_FILE', 'w') as f:
+    json.dump(services, f, ensure_ascii=False, indent=2)
+print(f'Removed: {label} ($id)')
+"
 }
 
 # ── Dispatch ──
@@ -191,17 +351,11 @@ case "${1:-}" in
 
     # Service commands
     run) shift; svc_run "$@" ;;
-    stop) shift; svc_kill "$@" ;;
     kill) shift; svc_kill "$@" ;;
     register) shift; svc_add "$@" ;;
     add) shift; svc_add "$@" ;;
-    list)
-        if server_status >/dev/null 2>&1; then
-            svc_list_with_status
-        else
-            svc_list
-        fi
-        ;;
+    remove) shift; svc_remove "$@" ;;
+    list) svc_list ;;
 
     # Install
     install)
@@ -238,7 +392,8 @@ case "${1:-}" in
         echo "  Services:"
         echo "    list        List all registered services"
         echo "    run <id>    Start a service"
-        echo "    stop <id>   Stop a service"
+        echo "    kill <id>   Stop a service"
+        echo "    remove <id>  Delete a service from registry"
         echo "    register <name> <path>  Register a new service"
         echo ""
         echo "  Setup:"
