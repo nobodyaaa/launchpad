@@ -1,8 +1,13 @@
 # 🚀 Launchpad
 
-A web dashboard for managing local services. Any service that can be started with `start.sh` and stopped with `stop.sh` — Docker or not — works with Launchpad.
+Local services dashboard — managed by you, or by your AI agent.
 
 [![GitHub](https://img.shields.io/badge/GitHub-nobodyaaa/launchpad-181717?logo=github)](https://github.com/nobodyaaa/launchpad)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-/launchpad-8A2BE2?logo=claude)](.)
+
+Launchpad is a **zero-dependency** web panel for managing local services. Any service that can be started with `start.sh` and stopped with `stop.sh` works — Docker or not.
+
+Its killer feature: **Claude Code can manage it for you.** Tell Claude "add my blog service" or "start the database," and it handles everything — creating scripts, registering the service, and monitoring status.
 
 ## Quick Start
 
@@ -16,23 +21,34 @@ lp start
 # Open http://localhost:9999
 ```
 
-Or run directly:
+Or run directly: `python3 server.py`
 
-```bash
-python3 server.py
-```
+## AI Agent Features
+
+Launchpad is built to be managed by Claude Code through the `/launchpad` skill:
+
+| What you say | What happens |
+|---|---|
+| `/launchpad add my-blog ~/projects/blog` | Claude creates `.launchpad/start.sh` & `.launchpad/stop.sh`, registers the service |
+| `/launchpad status` | Claude checks panel status and lists all services |
+| "Start the database" | Claude runs `lp run db` |
+| "Kill the API server" | Claude runs `lp kill api` |
+| "What's running?" | Claude queries and summarizes service states |
+
+No tab-switching, no command lookups — just tell Claude what you need.
 
 ## Features
 
-- **One-click start/stop** for any local service
+- **AI-native** — full Claude Code skill (`/launchpad`) for natural language management
+- **One-click start/stop** via web UI for any local service
 - **Docker integration** — auto-detects container status, port mappings, and logs
-- **Generic services** — works without Docker for any process
-- **Live status** — auto-refreshes every 15 seconds
-- **AI-assisted setup** — use `/launchpad` in Claude Code to add services interactively
+- **Generic services** — works with any process, Docker or not
+- **Live status** — auto-refreshes every 15 seconds, no page reload needed
+- **Zero dependencies** — Python stdlib only on the backend, vanilla HTML/CSS/JS on the frontend
 
 ## How It Works
 
-Every service needs two scripts inside a `.launchpad/` subdirectory:
+Every service needs two scripts inside a `.launchpad/` subdirectory. Claude Code's `/launchpad` skill can generate these for you automatically.
 
 | Script | Purpose | Required |
 |--------|---------|----------|
@@ -48,8 +64,7 @@ If either script is missing, the web UI shows a warning and disables the action 
 - Container logs available in the UI
 
 **Generic services** — no docker-compose file
-- Start/stop only
-- State shows `—`
+- Start/stop with live status detection
 
 ## CLI Commands (`lp`)
 
@@ -72,12 +87,17 @@ lp restart                 # Restart the panel
 
 ## Adding a New Service
 
-1. Create `.launchpad/start.sh` and `.launchpad/stop.sh` in the project directory (`chmod +x`)
-2. Run `lp register MyService /path/to/project`
-3. Or click **+ Add Service** in the web UI
-4. Or use the `/launchpad` command in Claude Code
+Three ways, pick your favorite:
+
+**🤖 Via Claude Code** — say "add my app" and Claude generates scripts + registers it
+**⌨️ Via CLI** — `lp register MyApp /path/to/project`
+**🖱️ Via Web UI** — click **+ Add Service** and fill in the form
+
+Whichever you choose, Launchpad requires `.launchpad/start.sh` and `.launchpad/stop.sh` in the project directory.
 
 ## Claude Code Skill Setup
+
+To let Claude manage Launchpad for you, install the `/launchpad` skill:
 
 ```bash
 # 1. Clone the repo
@@ -87,18 +107,15 @@ cd launchpad
 # 2. Install the global `lp` command
 bash launch.sh install
 
-# 3. Install the launchpad skill
-mkdir -p ~/.claude/skills/launchpad
+# 3. Install the skill
 cp SKILL.md ~/.claude/skills/launchpad/SKILL.md
+#    Then edit SKILL.md — replace <launchpad-dir> with your actual path
 
-# 4. Edit SKILL.md — replace <launchpad-dir> with your actual path
-#    vim ~/.claude/skills/launchpad/SKILL.md
-
-# 5. Start the panel
+# 4. Start the panel
 lp start
 ```
 
-Then use `/launchpad` in Claude Code to add or manage services.
+Now when you ask Claude "add my service" or "check what's running," it handles the rest via `/launchpad`.
 
 ## File Structure
 
