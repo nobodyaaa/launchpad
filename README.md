@@ -7,11 +7,21 @@
 ## 快速开始
 
 ```bash
-python3 server.py
+# 安装全局命令
+bash launch.sh install && source ~/.bashrc
+
+# 启动面板
+lp start
+
+# 管理服务
+lp list
+lp run n8n
+lp stop n8n
 ```
-或后台运行：
+
+或直接启动：
 ```bash
-bash launch.sh start
+python3 server.py
 ```
 
 打开 http://localhost:9999
@@ -48,9 +58,28 @@ bash launch.sh start
 ## 添加新服务
 
 1. 在项目目录下创建 `.launchpad/start.sh` 和 `.launchpad/stop.sh`（`chmod +x`）
-2. 在 Web 界面点 **+ Add Service**，填入路径即可
-3. 也可以直接编辑 `services.json`
-4. 或者用 `/launchpad` 命令让 AI 帮你添加
+2. `lp register MyService /path/to/project` — 注册新服务
+3. 在 Web 界面点 **+ Add Service**，填入路径即可
+4. 也可以直接编辑 `services.json`
+5. 或者用 `/launchpad` 命令让 AI 帮你添加
+
+## 命令行（lp）
+
+安装后可以在任意目录调用 `lp` 管理服务和面板：
+
+```bash
+# 服务管理
+lp list                    # 列出所有服务及状态
+lp run n8n                 # 启动服务
+lp stop n8n                # 停止服务
+lp register MyApp ~/app    # 注册新服务
+
+# 面板控制
+lp start                   # 启动 Web 面板
+lp stop                    # 停止 Web 面板
+lp status                  # 查看面板运行状态
+lp restart                 # 重启面板
+```
 
 ## Claude Code Skill 安装
 
@@ -61,16 +90,18 @@ bash launch.sh start
 git clone https://github.com/nobodyaaa/launchpad.git
 cd launchpad
 
-# 2. 安装 skill
+# 2. 安装全局 lp 命令
+bash launch.sh install
+
+# 3. 安装 skill
 mkdir -p ~/.claude/skills/launchpad
 cp SKILL.md ~/.claude/skills/launchpad/SKILL.md
 
-# 3. 编辑 SKILL.md，将 PROJECT_DIR 路径改为你的实际路径
+# 4. 编辑 SKILL.md，将 /path/to/launchpad 改为你的实际路径
 #    vim ~/.claude/skills/launchpad/SKILL.md
-#    搜索 /home/azyuli/projects/launchpad 替换为你的路径
 
-# 4. 启动面板
-bash launch.sh start
+# 5. 启动面板
+lp start
 ```
 
 安装后在 Claude Code 会话中输入 `/launchpad` 即可使用。
@@ -82,7 +113,7 @@ launchpad/
 ├── server.py        # Python 后端（零依赖）
 ├── index.html       # 管理界面
 ├── services.json    # 服务注册配置
-├── launch.sh        # 后台启动/停止脚本
+├── launch.sh        # CLI 入口（安装为 lp 命令）
 ├── SKILL.md         # Claude Code skill 定义
 ├── CLAUDE.md        # 项目开发约定
 └── README.md        # 本文件

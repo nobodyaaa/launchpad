@@ -7,12 +7,28 @@
 - **server.py** — Python 后端（零依赖，仅用标准库）
 - **index.html** — 前端管理界面
 - **services.json** — 已注册的服务列表
+- **launch.sh** — CLI 入口（安装为 `lp` 命令）
 
-启动：`bash launch.sh start` → http://localhost:9999 （后台运行）
-       `python3 server.py` → http://localhost:9999 （前台运行）
-停止：`bash launch.sh stop`
+### 全局命令（lp）
 
-添加服务使用 `/launchpad` 命令即可。
+```bash
+# 安装
+bash launch.sh install    # → ~/.local/bin/lp
+
+# 面板控制
+lp start                  # 启动 Web 面板 http://localhost:9999
+lp stop                   # 停止面板
+lp status                 # 查看面板状态
+lp restart                # 重启面板
+
+# 服务管理
+lp list                   # 列出所有服务
+lp run <id>               # 启动服务
+lp stop <id>              # 停止服务
+lp register <name> <path> # 注册新服务
+```
+
+添加服务使用 `/launchpad` 命令或 `lp register` 即可。
 
 ## 服务类型
 

@@ -7,12 +7,23 @@ description: Add, remove, or manage services in Launchpad — the local service 
 
 Launchpad is a web dashboard for managing local services. Each service stores its scripts in a `.launchpad/` subdirectory (so they don't conflict with any existing scripts in the project). The start/stop scripts plus a registration entry in `services.json` are all that's needed.
 
+## Quick Reference
+
+| Command | What it does |
+|---------|-------------|
+| `lp start` | Start web panel |
+| `lp list` | List all services |
+| `lp run <id>` | Start a service |
+| `lp stop <id>` | Stop a service |
+| `lp register <name> <path>` | Register a new service |
+
 ## Reference
 
 - **Project dir**: `/path/to/launchpad/`
+- **CLI command**: `lp` (installed via `bash launch.sh install`)
 - **Config file**: `services.json`
 - **Server script**: `server.py`
-- **Launch script**: `launch.sh` (start/stop/status)
+- **Launch script**: `launch.sh` (CLI entry point)
 - **Frontend**: `index.html`
 
 ## Workflow
@@ -127,6 +138,7 @@ If the Launchpad server isn't running, start it:
 
 ```bash
 bash /path/to/launchpad/launch.sh start
+# or if installed: lp start
 ```
 
 ### 7. Verify

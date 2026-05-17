@@ -13,7 +13,8 @@ from pathlib import Path
 HOST = "127.0.0.1"
 PORT = 9999
 STATIC_DIR = Path(__file__).parent
-CONFIG_FILE = STATIC_DIR / "services.json"
+CONFIG_DIR = Path(os.environ.get("LAUNCHPAD_DIR", str(STATIC_DIR)))
+CONFIG_FILE = CONFIG_DIR / "services.json"
 
 DEFAULT_SERVICES: dict[str, dict] = {
     "n8n": {
@@ -144,12 +145,15 @@ def get_all_services() -> list[dict]:
             continue
         is_docker = has_compose_file(svc_dir)
         status = get_service_status(svc_dir, is_docker)
+        ports = status["ports"]
+        explicit_url = svc.get("url", "")
+        auto_url = f"http://localhost:{ports[0]}" if ports and not explicit_url else ""
         result.append({
             "id": key, "label": svc["label"], "icon": svc["icon"],
-            "description": svc["description"], "url": svc.get("url", ""), "available": True,
+            "description": svc["description"], "url": explicit_url or auto_url, "available": True,
             "state": status["state"],
             "containers": status["containers"],
-            "ports": status["ports"],
+            "ports": ports,
             "has_start_script": check_script(svc_dir, "start.sh"),
             "has_stop_script": check_script(svc_dir, "stop.sh"),
             "is_docker": is_docker,

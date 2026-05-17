@@ -2,9 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-PID_FILE="$SCRIPT_DIR/.launchpad.pid"
-LOG_FILE="$SCRIPT_DIR/launchpad.log"
-CONFIG_FILE="$SCRIPT_DIR/services.json"
+DATA_DIR="${LAUNCHPAD_DIR:-$HOME/.launchpad}"
+PID_FILE="$DATA_DIR/.launchpad.pid"
+LOG_FILE="$DATA_DIR/launchpad.log"
+CONFIG_FILE="$DATA_DIR/services.json"
 SERVER_SCRIPT="$SCRIPT_DIR/server.py"
 
 API="http://127.0.0.1:9999/api/services"
@@ -22,7 +23,7 @@ server_start() {
         rm "$PID_FILE"
     fi
 
-    nohup python3 "$SERVER_SCRIPT" >> "$LOG_FILE" 2>&1 &
+    LAUNCHPAD_DIR="$DATA_DIR" nohup python3 "$SERVER_SCRIPT" >> "$LOG_FILE" 2>&1 &
     pid=$!
     echo $pid > "$PID_FILE"
     disown "$pid" 2>/dev/null || true
@@ -204,16 +205,25 @@ case "${1:-}" in
 
     # Install
     install)
-        local target="${2:-$HOME/.local/bin/lp}"
+        target="${2:-$HOME/.local/bin/lp}"
         mkdir -p "$(dirname "$target")"
         ln -sf "$SCRIPT_DIR/launch.sh" "$target"
         chmod +x "$SCRIPT_DIR/launch.sh"
+
+        mkdir -p "$DATA_DIR"
+        if [ ! -f "$CONFIG_FILE" ] && [ -f "$SCRIPT_DIR/services.json" ]; then
+            cp "$SCRIPT_DIR/services.json" "$CONFIG_FILE"
+            echo "Copied default services.json to $CONFIG_FILE"
+        fi
+
         echo "Installed to $target"
+        echo "Data directory: $DATA_DIR"
         echo "Make sure $(dirname "$target") is in your PATH"
         ;;
     uninstall)
         rm -f "$HOME/.local/bin/lp" "$HOME/.local/bin/launchpad" 2>/dev/null
         echo "Uninstalled"
+        echo "Note: data in $DATA_DIR was kept"
         ;;
 
     *)
