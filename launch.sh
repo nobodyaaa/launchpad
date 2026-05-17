@@ -5,6 +5,7 @@ cd "$(dirname "$0")"
 
 PID_FILE=".launchpad.pid"
 LOG_FILE="launchpad.log"
+CONFIG_FILE="services.json"
 
 start() {
     if [ -f "$PID_FILE" ]; then
@@ -57,10 +58,130 @@ status() {
     return 1
 }
 
-case "${1:-start}" in
+run_service() {
+    local id="$1"
+    if [ -z "$id" ]; then
+        echo "Usage: $0 run <service-id>"
+        exit 1
+    fi
+    local dir
+    dir=$(python3 -c "
+import json
+with open('$CONFIG_FILE') as f:
+    svc = json.load(f).get('$id', {})
+print(svc.get('path', ''))
+")
+    if [ -z "$dir" ]; then
+        echo "Service '$id' not found in $CONFIG_FILE"
+        exit 1
+    fi
+    local script="$dir/.launchpad/start.sh"
+    if [ ! -f "$script" ]; then
+        echo "start.sh not found in $dir/.launchpad/"
+        exit 1
+    fi
+    echo "Starting $id..."
+    bash "$script"
+    echo "$id started"
+}
+
+kill_service() {
+    local id="$1"
+    if [ -z "$id" ]; then
+        echo "Usage: $0 kill <service-id>"
+        exit 1
+    fi
+    local dir
+    dir=$(python3 -c "
+import json
+with open('$CONFIG_FILE') as f:
+    svc = json.load(f).get('$id', {})
+print(svc.get('path', ''))
+")
+    if [ -z "$dir" ]; then
+        echo "Service '$id' not found in $CONFIG_FILE"
+        exit 1
+    fi
+    local script="$dir/.launchpad/stop.sh"
+    if [ ! -f "$script" ]; then
+        echo "stop.sh not found in $dir/.launchpad/"
+        exit 1
+    fi
+    echo "Stopping $id..."
+    bash "$script"
+    echo "$id stopped"
+}
+
+add_service() {
+    local path="${1:-}"
+    local label="${2:-}"
+    local icon="${3:-📦}"
+
+    if [ -z "$path" ]; then
+        echo "Usage: $0 add <path> [label] [icon]"
+        echo ""
+        echo "  path   Absolute path to the service directory"
+        echo "  label  Display name (default: directory name)"
+        echo "  icon   Emoji icon (default: 📦)"
+        exit 1
+    fi
+
+    # Resolve to absolute path
+    path="$(cd "$path" 2>/dev/null && pwd)" || {
+        echo "Directory not found: $path"
+        exit 1
+    }
+
+    local id
+    id=$(basename "$path" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]/-/g')
+    [ -z "$label" ] && label=$(basename "$path")
+
+    # Register in services.json
+    python3 -c "
+import json
+with open('$CONFIG_FILE') as f:
+    services = json.load(f)
+services['$id'] = {
+    'label': '$label',
+    'icon': '$icon',
+    'path': '$path',
+    'description': ''
+}
+with open('$CONFIG_FILE', 'w') as f:
+    json.dump(services, f, ensure_ascii=False, indent=2)
+print('Registered: $label ($id)')
+"
+
+    # Notify running server to refresh
+    if [ -f "$PID_FILE" ]; then
+        pid=$(cat "$PID_FILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "Server is running — refresh http://localhost:9999 to see it"
+        fi
+    fi
+}
+
+case "${1:-}" in
     start) start ;;
     stop) stop ;;
     status) status ;;
     restart) stop; sleep 1; start ;;
-    *) echo "Usage: $0 {start|stop|status|restart}"; exit 1 ;;
+    run) shift; run_service "$@" ;;
+    kill) shift; kill_service "$@" ;;
+    add) shift; add_service "$@" ;;
+    *)
+        echo "Usage: $0 {start|stop|status|restart|run|kill|add}"
+        echo ""
+        echo "  Server:"
+        echo "    start    Start the Launchpad web server"
+        echo "    stop     Stop the Launchpad web server"
+        echo "    status   Check if the server is running"
+        echo "    restart  Restart the server"
+        echo ""
+        echo "  Services:"
+        echo "    run <id>  Start a service by its ID"
+        echo "    kill <id> Stop a service by its ID"
+        echo "    add <path> [label] [icon]  Register a new service"
+        exit 1
+        ;;
 esac
