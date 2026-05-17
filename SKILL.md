@@ -1,6 +1,6 @@
 ---
 name: launchpad
-description: Add, remove, or manage services in Launchpad — the local service management dashboard. Use when the user wants to register a new service, delete a service, or check service status. Run `chmod +x /path/to/launchpad/launch.sh` if not already executable.
+description: Add, remove, or manage services in Launchpad — the local service management dashboard. Use when the user wants to register a new service, delete a service, or check service status. Run `chmod +x /home/azyuli/projects/launchpad/launch.sh` if not already executable.
 ---
 
 # Launchpad Skill
@@ -19,9 +19,10 @@ Launchpad is a web dashboard for managing local services. Each service stores it
 
 ## Reference
 
-- **Project dir**: `/path/to/launchpad/`
+- **Project dir**: `/home/azyuli/projects/launchpad/`
 - **CLI command**: `lp` (installed via `bash launch.sh install`)
-- **Config file**: `services.json`
+- **Config file**: `~/.launchpad/services.json`
+- **Data dir**: `~/.launchpad/` (config, logs, PID file)
 - **Server script**: `server.py`
 - **Launch script**: `launch.sh` (CLI entry point)
 - **Frontend**: `index.html`
@@ -116,7 +117,7 @@ Base the script template on what you detected:
 
 ### 5. Register in services.json
 
-Read and update `/path/to/launchpad/services.json`. Each entry:
+Read and update `~/.launchpad/services.json`. Each entry:
 
 ```json
 {
@@ -137,7 +138,7 @@ Use the Edit tool to modify services.json, or read and rewrite it.
 If the Launchpad server isn't running, start it:
 
 ```bash
-bash /path/to/launchpad/launch.sh start
+bash /home/azyuli/projects/launchpad/launch.sh start
 # or if installed: lp start
 ```
 
