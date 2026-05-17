@@ -737,7 +737,7 @@ function renderCard(svc) {
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         ${svc.url ? `<a href="${svc.url}" target="_blank" class="btn-open" title="Open ${svc.label}">↗</a>` : ""}
-        <span class="status ${displayState}"><span class="status-dot"></span>${svc.is_docker ? svc.state : '—'}</span>
+        <span class="status ${displayState}"><span class="status-dot"></span>${svc.state}</span>
         <button class="btn-delete" onclick="requestDelete('${svc.id}')" title="Remove service">✕</button>
       </div>
     </div>

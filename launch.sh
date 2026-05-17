@@ -51,13 +51,13 @@ _stop_all_services() {
     if [ ! -f "$CONFIG_FILE" ]; then
         return
     fi
-    python3 -c "
-import json, subprocess, sys
-with open('$CONFIG_FILE') as f:
+    LP_CONFIG="$CONFIG_FILE" python3 -c "
+import json, subprocess, os
+with open(os.environ['LP_CONFIG']) as f:
     services = json.load(f)
 for svc_id, svc in services.items():
     script = svc.get('path', '') + '/.launchpad/stop.sh'
-    result = subprocess.run(['bash', script], capture_output=True, text=True)
+    result = subprocess.run(['bash', script], capture_output=True, text=True, timeout=30)
     if result.returncode == 0:
         print(f'  ✓ {svc[\"label\"]}')
     else:
@@ -113,10 +113,10 @@ server_restart() {
 # ── Services ──
 
 _svc_path() {
-    python3 -c "
-import json, sys
+    LP_SVC_ID="$1" LP_CONFIG="$CONFIG_FILE" python3 -c "
+import json, os
 try:
-    svc = json.load(open('$CONFIG_FILE')).get('$1', {})
+    svc = json.load(open(os.environ['LP_CONFIG'])).get(os.environ['LP_SVC_ID'], {})
     print(svc.get('path', ''))
 except Exception:
     pass
@@ -176,25 +176,22 @@ svc_add() {
         exit 1
     fi
 
-    python3 -c "
-import json
-with open('$CONFIG_FILE') as f:
+    LP_CONFIG="$CONFIG_FILE" LP_ID="$id" LP_NAME="$name" LP_PATH="$path" python3 -c "
+import json, os
+cfg_path = os.environ['LP_CONFIG']
+with open(cfg_path) as f:
     services = json.load(f)
-services['$id'] = {
-    'label': '$name',
+svc_id = os.environ['LP_ID']
+services[svc_id] = {
+    'label': os.environ['LP_NAME'],
     'icon': '📦',
-    'path': '$path',
+    'path': os.environ['LP_PATH'],
     'description': ''
 }
-with open('$CONFIG_FILE', 'w') as f:
+with open(cfg_path, 'w') as f:
     json.dump(services, f, ensure_ascii=False, indent=2)
-print('Registered: $name ($id)')
+print('Registered: ' + os.environ['LP_NAME'] + ' (' + svc_id + ')')
 "
-
-    if [ ! -d "$path/.launchpad" ]; then
-        echo "Note: $path/.launchpad/ doesn't exist — create start.sh and stop.sh"
-        echo "Hint: use /launchpad skill to auto-generate them"
-    fi
 }
 
 svc_list() {
@@ -203,7 +200,7 @@ svc_list() {
         return
     fi
 
-    python3 -c "
+    LP_CONFIG="$CONFIG_FILE" python3 -c "
 import json, os, subprocess, sys, socket
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -219,7 +216,7 @@ try:
 except Exception:
     pass
 
-cfg = json.load(open('$CONFIG_FILE'))
+cfg = json.load(open(os.environ['LP_CONFIG']))
 
 def get_status(svc_id, svc):
     path = svc.get('path', '')
@@ -272,9 +269,9 @@ for svc_id, state, label in sorted(results, key=lambda x: x[0]):
     print(f'{svc_id:<20} {state:<8}  {label}')
 " 2>/dev/null || {
     # Fallback: just dump ids
-    python3 -c "
-import json
-cfg = json.load(open('$CONFIG_FILE'))
+    LP_CONFIG="$CONFIG_FILE" python3 -c "
+import json, os
+cfg = json.load(open(os.environ['LP_CONFIG']))
 for k in cfg:
     print(k)
 " 2>/dev/null || echo 'error listing services'
@@ -285,19 +282,22 @@ svc_remove() {
     local id="$1"
     [ -n "$id" ] || { echo "Usage: launchpad remove <id>"; exit 1; }
 
-    python3 -c "
+    LP_SVC_ID="$id" LP_CONFIG="$CONFIG_FILE" python3 -c "
 import json, os, subprocess, socket
 from urllib.parse import urlparse
 
-with open('$CONFIG_FILE') as f:
+svc_id = os.environ['LP_SVC_ID']
+cfg_path = os.environ['LP_CONFIG']
+
+with open(cfg_path) as f:
     services = json.load(f)
 
-svc = services.get('$id')
+svc = services.get(svc_id)
 if not svc:
-    print('Service \"$id\" not found')
+    print(f'Service \"{svc_id}\" not found')
     exit(1)
 
-label = svc.get('label', '$id')
+label = svc.get('label', svc_id)
 path = svc.get('path', '')
 url = svc.get('url', '')
 
@@ -330,13 +330,13 @@ elif path and os.path.isdir(path):
         running = r.returncode == 0 and bool(r.stdout.strip())
 
 if running:
-    print(f'{label} ($id) is still running — stop it first with \"lp kill $id\"')
+    print(f'{label} ({svc_id}) is still running — stop it first with \"lp kill {svc_id}\"')
     exit(1)
 
-del services['$id']
-with open('$CONFIG_FILE', 'w') as f:
+del services[svc_id]
+with open(cfg_path, 'w') as f:
     json.dump(services, f, ensure_ascii=False, indent=2)
-print(f'Removed: {label} ($id)')
+print(f'Removed: {label} ({svc_id})')
 "
 }
 

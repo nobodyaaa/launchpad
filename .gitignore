@@ -13,3 +13,6 @@ Thumbs.db
 
 # Playwright screenshots (from testing)
 .playwright-mcp/
+
+# Project-local dev conventions (not for remote)
+CLAUDE.md

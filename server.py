@@ -46,16 +46,29 @@ def load_services() -> dict[str, dict]:
     if CONFIG_FILE.exists():
         try:
             data = json.loads(CONFIG_FILE.read_text())
-            if isinstance(data, dict) and len(data) > 0:
+            if isinstance(data, dict):
                 return data
         except (json.JSONDecodeError, OSError):
-            pass
-    save_services(DEFAULT_SERVICES)
-    return dict(DEFAULT_SERVICES)
+            print(f"Warning: Failed to read {CONFIG_FILE}, starting fresh", file=sys.stderr)
+    if not CONFIG_FILE.exists():
+        save_services(DEFAULT_SERVICES)
+        return dict(DEFAULT_SERVICES)
+    return {}
 
 
 def save_services(services: dict[str, dict]) -> None:
     CONFIG_FILE.write_text(json.dumps(services, ensure_ascii=False, indent=2))
+
+
+def _get_listeners() -> set[str]:
+    listeners: set[str] = set()
+    r = run_cmd(["ss", "-tlnp", "--no-header"])
+    if r["ok"]:
+        for line in r["stdout"].strip().split("\n"):
+            parts = line.strip().split()
+            if len(parts) >= 4:
+                listeners.add(parts[3].rsplit(":", 1)[-1])
+    return listeners
 
 
 def run_cmd(cmd: list[str], cwd: str | None = None, timeout: int = 30) -> dict:
@@ -86,11 +99,10 @@ def has_compose_file(svc_dir: str) -> bool:
 def get_service_status(service_dir: str, is_docker: bool, url: str = "", listeners: set[str] | None = None) -> dict:
     # Port check first (unified for docker and non-docker)
     if url and listeners is not None:
-        from urllib.parse import urlparse
         parsed = urlparse(url)
         port = str(parsed.port) if parsed.port else ""
         if port:
-            return {"state": "running" if port in listeners else "stopped", "containers": [], "ports": []}
+            return {"state": "running" if port in listeners else "stopped", "containers": [], "ports": [port]}
 
     if is_docker:
         project = os.path.basename(os.path.normpath(service_dir))
@@ -129,14 +141,7 @@ def get_all_services() -> list[dict]:
     services = load_services()
     result: list[dict] = []
 
-    # One-shot: collect all listening ports
-    listeners: set[str] = set()
-    r = run_cmd(["ss", "-tlnp", "--no-header"])
-    if r["ok"]:
-        for line in r["stdout"].strip().split("\n"):
-            parts = line.strip().split()
-            if len(parts) >= 4:
-                listeners.add(parts[3].rsplit(":", 1)[-1])
+    listeners = _get_listeners()
 
     def build(svc_id: str, svc: dict) -> dict:
         svc_dir = svc["path"]
@@ -170,6 +175,7 @@ def get_all_services() -> list[dict]:
         for f in as_completed(futures):
             result.append(f.result())
 
+    result.sort(key=lambda s: s["id"])
     return result
 
 
@@ -267,6 +273,7 @@ class Handler(BaseHTTPRequestHandler):
                 "label": body.get("label", svc_id),
                 "icon": body.get("icon", "📦"),
                 "path": body.get("path", ""),
+                "url": body.get("url", ""),
                 "description": body.get("description", ""),
             }
             save_services(services)
@@ -293,7 +300,7 @@ class Handler(BaseHTTPRequestHandler):
                 r_obj = run_cmd(["bash", script], cwd=svc_dir, timeout=120)
                 time.sleep(1)
                 is_docker = has_compose_file(svc_dir)
-                status = get_service_status(svc_dir, is_docker, svc.get("url", ""), set())
+                status = get_service_status(svc_dir, is_docker, svc.get("url", ""), _get_listeners())
                 self._send_json({"ok": r_obj["ok"], "message": r_obj["stdout"] or r_obj["stderr"], "service": status})
             elif action == "stop":
                 script = os.path.join(svc_dir, ".launchpad", "stop.sh")
@@ -303,7 +310,7 @@ class Handler(BaseHTTPRequestHandler):
                 r_obj = run_cmd(["bash", script], cwd=svc_dir, timeout=120)
                 time.sleep(1)
                 is_docker = has_compose_file(svc_dir)
-                status = get_service_status(svc_dir, is_docker, svc.get("url", ""), set())
+                status = get_service_status(svc_dir, is_docker, svc.get("url", ""), _get_listeners())
                 self._send_json({"ok": r_obj["ok"], "message": r_obj["stdout"] or r_obj["stderr"], "service": status})
             else:
                 self._send_json({"error": "Unknown action"}, 400)
@@ -335,8 +342,16 @@ def main() -> None:
     print(f"\n  🚀 Launchpad running at http://localhost:{PORT}")
     print(f"  Press Ctrl+C to stop\n")
 
+    def stop_all_services() -> None:
+        for svc in load_services().values():
+            script = os.path.join(svc.get("path", ""), ".launchpad", "stop.sh")
+            if os.path.isfile(script):
+                run_cmd(["bash", script], cwd=svc["path"], timeout=30)
+
     def shutdown(sig, frame) -> None:
-        print("\n  Shutting down...")
+        print("\n  Stopping services...")
+        stop_all_services()
+        print("  Shutting down server...")
         server.shutdown()
         sys.exit(0)
 
