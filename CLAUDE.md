@@ -87,3 +87,11 @@ project/
 - 启停只认 `.launchpad/start.sh` / `.launchpad/stop.sh`，不兜底任何其他方式
 - 脚本不存在时页面会显示警告并禁用按钮
 - 前端和后端均在本地运行（127.0.0.1:9999）
+
+## 文档同步
+
+每次项目代码变更（launch.sh / server.py / index.html），必须同步检查以下文件是否需要更新：
+
+- **README.md** — 用户可见的说明文档
+- **CLAUDE.md** — 开发规范和流程
+- **SKILL.md** — Claude Code skill 定义（命令、流程、模板）
