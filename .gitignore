@@ -1,6 +1,7 @@
-# Runtime files
+# Runtime files (stored in ~/.launchpad/)
 launchpad.log
 .launchpad.pid
+services.json
 
 # IDE
 .vscode/
