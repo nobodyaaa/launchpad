@@ -1,5 +1,5 @@
 ---
-name: launchpad
+name: lp
 description: Add, remove, or manage services in Launchpad — the local service management dashboard. Use when the user wants to register a new service, delete a service, or check service status. Run `chmod +x <launchpad-dir>/launch.sh` if not already executable.
 ---
 

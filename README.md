@@ -3,7 +3,7 @@
 Local services dashboard — managed by you, or by your AI agent.
 
 [![GitHub](https://img.shields.io/badge/GitHub-nobodyaaa/launchpad-181717?logo=github)](https://github.com/nobodyaaa/launchpad)
-[![Claude Code](https://img.shields.io/badge/Claude_Code-/launchpad-8A2BE2?logo=claude)](.)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-/lp-8A2BE2?logo=claude)](.)
 
 Launchpad is a **zero-dependency** web panel for managing local services. Any service that can be started with `start.sh` and stopped with `stop.sh` works — Docker or not.
 
@@ -25,19 +25,19 @@ Or run directly: `python3 server.py`
 
 ## AI Agent Features
 
-Launchpad is built to be managed by Claude Code through `/launchpad`:
+Launchpad is built to be managed by Claude Code through `/lp`:
 
 | What you say | What happens |
 |---|---|
-| `/launchpad add my-blog ~/projects/blog` | Claude creates `.launchpad/start` & `.launchpad/stop`, registers the service |
-| `/launchpad status` | Claude checks panel status and lists all services |
-| `/launchpad start db` | Claude runs `lp run db` |
-| `/launchpad kill api` | Claude runs `lp kill api` |
-| `/launchpad status` | Claude queries and summarizes service states |
+| `/lp add my-blog ~/projects/blog` | Claude creates `.launchpad/start` & `.launchpad/stop`, registers the service |
+| `/lp status` | Claude checks panel status and lists all services |
+| `/lp start db` | Claude runs `lp run db` |
+| `/lp kill api` | Claude runs `lp kill api` |
+| `/lp status` | Claude queries and summarizes service states |
 
 ## Features
 
-- **AI-native** — full Claude Code skill (`/launchpad`) for natural language management
+- **AI-native** — full Claude Code skill (`/lp`) for natural language management
 - **One-click start/stop** via web UI for any local service
 - **Docker integration** — auto-detects container status, port mappings, and logs
 - **Generic services** — works with any process, Docker or not
@@ -46,7 +46,7 @@ Launchpad is built to be managed by Claude Code through `/launchpad`:
 
 ## How It Works
 
-Every service needs two scripts inside a `.launchpad/` subdirectory. Claude Code's `/launchpad` skill can generate these for you automatically.
+Every service needs two scripts inside a `.launchpad/` subdirectory. Claude Code's `/lp` skill can generate these for you automatically.
 
 | Script | Purpose | Required |
 |--------|---------|----------|
@@ -95,7 +95,7 @@ Whichever you choose, Launchpad requires `.launchpad/start.sh` and `.launchpad/s
 
 ## Claude Code Skill Setup
 
-To let Claude manage Launchpad for you, install the `/launchpad` skill:
+To let Claude manage Launchpad for you, install the `/lp` skill:
 
 ```bash
 # 1. Clone the repo
@@ -113,7 +113,7 @@ cp SKILL.md ~/.claude/skills/launchpad/SKILL.md
 lp start
 ```
 
-Now when you ask Claude "add my service" or "check what's running," it handles the rest via `/launchpad`.
+Now when you ask Claude "add my service" or "check what's running," it handles the rest via `/lp`.
 
 ## File Structure
 

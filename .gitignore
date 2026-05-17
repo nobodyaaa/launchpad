@@ -14,5 +14,9 @@ Thumbs.db
 # Playwright screenshots (from testing)
 .playwright-mcp/
 
+# Python
+__pycache__/
+*.pyc
+
 # Project-local dev conventions (not for remote)
 CLAUDE.md
