@@ -25,17 +25,15 @@ Or run directly: `python3 server.py`
 
 ## AI Agent Features
 
-Launchpad is built to be managed by Claude Code through the `/launchpad` skill:
+Launchpad is built to be managed by Claude Code through `/launchpad`:
 
 | What you say | What happens |
 |---|---|
-| `/launchpad add my-blog ~/projects/blog` | Claude creates `.launchpad/start.sh` & `.launchpad/stop.sh`, registers the service |
+| `/launchpad add my-blog ~/projects/blog` | Claude creates `.launchpad/start` & `.launchpad/stop`, registers the service |
 | `/launchpad status` | Claude checks panel status and lists all services |
-| "Start the database" | Claude runs `lp run db` |
-| "Kill the API server" | Claude runs `lp kill api` |
-| "What's running?" | Claude queries and summarizes service states |
-
-No tab-switching, no command lookups — just tell Claude what you need.
+| `/launchpad start db` | Claude runs `lp run db` |
+| `/launchpad kill api` | Claude runs `lp kill api` |
+| `/launchpad status` | Claude queries and summarizes service states |
 
 ## Features
 
