@@ -1,0 +1,14 @@
+# Runtime files
+launchpad.log
+.launchpad.pid
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Playwright screenshots (from testing)
+.playwright-mcp/
